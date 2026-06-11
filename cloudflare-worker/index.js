@@ -176,11 +176,26 @@ async function handleRequest(request, env) {
       }),
     });
 
+    try {
+    const response = await fetch(ANTHROPIC_API, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 2000,
+        messages: anthropicMessages,
+      }),
+    });
+
+    const rawBody = await response.text();
+
     if (!response.ok) {
-      const errText = await response.text();
-      console.error("Anthropic error:", errText);
       return new Response(
-        JSON.stringify({ error: "Anthropic API error", details: errText }),
+        JSON.stringify({ error: "Anthropic API error", details: rawBody, status: response.status }),
         {
           status: response.status,
           headers: {
@@ -191,7 +206,16 @@ async function handleRequest(request, env) {
       );
     }
 
-    const data = await response.json();
+    let data;
+    try {
+      data = JSON.parse(rawBody);
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON from Anthropic", raw: rawBody.slice(0, 500) }),
+        { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+      );
+    }
+
     const rawText = data.content
       .filter((b) => b.type === "text")
       .map((b) => b.text)
@@ -206,9 +230,8 @@ async function handleRequest(request, env) {
       },
     });
   } catch (err) {
-    console.error("Worker error:", err);
     return new Response(
-      JSON.stringify({ error: "Internal error", message: err.message }),
+      JSON.stringify({ error: "Internal error", message: err.message, stack: err.stack }),
       {
         status: 500,
         headers: {
@@ -218,8 +241,3 @@ async function handleRequest(request, env) {
       }
     );
   }
-}
-
-export default {
-  fetch: handleRequest,
-};
