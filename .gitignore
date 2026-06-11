@@ -1,0 +1,25 @@
+# Secrets — NE JAMAIS COMMITER
+.env
+.env.local
+.env.*.local
+
+# Dépendances
+node_modules/
+cloudflare-worker/node_modules/
+
+# Build
+dist/
+.cloudflare/
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db
