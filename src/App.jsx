@@ -1,7 +1,7 @@
 // src/App.jsx
 import { useState, useEffect } from "react";
 import { onAuthStateChanged, signInWithPopup } from "firebase/auth";
-import { doc, collection, getDocs, getDoc, orderBy, query } from "firebase/firestore";
+import { doc, collection, getDoc } from "firebase/firestore";
 import { auth, googleProvider, db } from "./firebase/config";
 import { useXP, XP_REWARDS } from "./hooks/useXP";
 import Navbar from "./components/Navbar";
@@ -9,8 +9,8 @@ import Upload from "./components/Upload";
 import Summary from "./components/Summary";
 import Quiz from "./components/Quiz";
 import Dashboard from "./components/Dashboard";
+import CourseList from "./components/CourseList";
 
-// Toast de notification XP
 function XPToast({ gain, onDone }) {
   useEffect(() => {
     const t = setTimeout(onDone, 2500);
@@ -24,7 +24,6 @@ function XPToast({ gain, onDone }) {
   );
 }
 
-// Écran de connexion
 function LoginScreen({ onLogin, loading }) {
   return (
     <div className="login-screen">
@@ -32,11 +31,7 @@ function LoginScreen({ onLogin, loading }) {
         <div className="login-logo">🎓</div>
         <h1 className="login-title">StudyAI</h1>
         <p className="login-subtitle">Scanne tes cours, révise intelligemment.</p>
-        <button
-          className="btn-google"
-          onClick={onLogin}
-          disabled={loading}
-        >
+        <button className="btn-google" onClick={onLogin} disabled={loading}>
           {loading ? "Connexion…" : (
             <>
               <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
@@ -59,14 +54,13 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
-  const [page, setPage] = useState("home"); // "home" | "course" | "quiz" | "dashboard"
-  const [activeCourse, setActiveCourse] = useState(null); // { courseId, quizId, summary, imageURL }
-  const [activeQuiz, setActiveQuiz] = useState(null); // { quizId, questions }
+  const [page, setPage] = useState("home");
+  const [activeCourse, setActiveCourse] = useState(null);
+  const [activeQuiz, setActiveQuiz] = useState(null);
   const [xpToast, setXPToast] = useState(null);
 
   const { profile, addXP, awardBadge, incrementQuizCount } = useXP(user?.uid);
 
-  // Auth listener
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -77,29 +71,30 @@ export default function App() {
 
   const handleLogin = async () => {
     setLoginLoading(true);
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (e) {
-      console.error("Erreur connexion Google:", e);
-    } finally {
-      setLoginLoading(false);
-    }
+    try { await signInWithPopup(auth, googleProvider); }
+    catch (e) { console.error("Erreur connexion Google:", e); }
+    finally { setLoginLoading(false); }
   };
 
-  // Appelé après Upload réussi
   const handleUploadComplete = async ({ courseId, quizId, summary, imageURL }) => {
     setActiveCourse({ courseId, quizId, summary, imageURL });
     setPage("course");
-
-    // XP pour upload d'un cours
     const result = await addXP(XP_REWARDS.COURSE_UPLOAD, "course_upload");
-    if (result) showXPToast(result.gained);
-
-    // Badge premier cours
+    if (result) setXPToast(result.gained);
     await awardBadge("first_course");
   };
 
-  // Charger le quiz depuis Firestore
+  // Ouvrir un cours depuis la liste
+  const handleOpenCourse = (course) => {
+    setActiveCourse({
+      courseId: course.id,
+      quizId: course.quizId,
+      summary: course.summary,
+      imageURL: course.imageURL,
+    });
+    setPage("course");
+  };
+
   const handleStartQuiz = async () => {
     if (!activeCourse?.quizId || !user?.uid) return;
     try {
@@ -115,22 +110,15 @@ export default function App() {
     }
   };
 
-  // Appelé à la fin d'un quiz
   const handleXPGain = async (amount, isPerfect) => {
     const result = await addXP(amount, "quiz_complete");
-    if (result) showXPToast(result.gained);
-
+    if (result) setXPToast(result.gained);
     await incrementQuizCount();
     await awardBadge("first_quiz");
     if (isPerfect) await awardBadge("perfect_10");
-
     const updatedTotal = (profile?.totalQuizzes || 0) + 1;
     if (updatedTotal >= 10) await awardBadge("quiz_10");
     if (updatedTotal >= 50) await awardBadge("quiz_50");
-  };
-
-  const showXPToast = (amount) => {
-    setXPToast(amount);
   };
 
   const handleHome = () => {
@@ -139,28 +127,23 @@ export default function App() {
     setActiveQuiz(null);
   };
 
-  if (authLoading) {
-    return (
-      <div className="splash">
-        <div className="splash-logo">🎓</div>
-        <div className="splash-spinner" />
-      </div>
-    );
-  }
+  const handleNavigate = (p) => {
+    if (p === "home") handleHome();
+    else setPage(p);
+  };
 
-  if (!user) {
-    return <LoginScreen onLogin={handleLogin} loading={loginLoading} />;
-  }
+  if (authLoading) return (
+    <div className="splash">
+      <div className="splash-logo">🎓</div>
+      <div className="splash-spinner" />
+    </div>
+  );
+
+  if (!user) return <LoginScreen onLogin={handleLogin} loading={loginLoading} />;
 
   return (
     <div className="app">
-      <Navbar
-        user={user}
-        profile={profile}
-        currentPage={page}
-        onNavigate={(p) => { setPage(p); if (p === "home") handleHome(); }}
-      />
-
+      <Navbar user={user} profile={profile} currentPage={page} onNavigate={handleNavigate} />
       <main className="main-content">
         {page === "home" && (
           <div className="home-page">
@@ -171,33 +154,20 @@ export default function App() {
             <Upload user={user} onComplete={handleUploadComplete} />
           </div>
         )}
-
+        {page === "courses" && (
+          <CourseList user={user} onOpenCourse={handleOpenCourse} />
+        )}
         {page === "course" && activeCourse && (
-          <Summary
-            summary={activeCourse.summary}
-            imageURL={activeCourse.imageURL}
-            onStartQuiz={handleStartQuiz}
-          />
+          <Summary summary={activeCourse.summary} imageURL={activeCourse.imageURL} onStartQuiz={handleStartQuiz} />
         )}
-
         {page === "quiz" && activeQuiz && (
-          <Quiz
-            quizId={activeQuiz.quizId}
-            questions={activeQuiz.questions}
-            user={user}
-            onXPGain={handleXPGain}
-            onHome={handleHome}
-          />
+          <Quiz quizId={activeQuiz.quizId} questions={activeQuiz.questions} user={user} onXPGain={handleXPGain} onHome={handleHome} />
         )}
-
         {page === "dashboard" && (
           <Dashboard user={user} profile={profile} />
         )}
       </main>
-
-      {xpToast && (
-        <XPToast gain={xpToast} onDone={() => setXPToast(null)} />
-      )}
+      {xpToast && <XPToast gain={xpToast} onDone={() => setXPToast(null)} />}
     </div>
   );
 }
