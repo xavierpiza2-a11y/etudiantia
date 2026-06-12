@@ -1,21 +1,18 @@
 /**
  * Cloudflare Worker — Proxy sécurisé Anthropic
- * Déployer sur : https://dash.cloudflare.com → Workers & Pages → Create Worker
- * Variable d'environnement à ajouter : ANTHROPIC_API_KEY
+ * Variable d'environnement requise : ANTHROPIC_API_KEY
  */
 
-const ALLOWED_ORIGIN = "https://your-app.pages.dev"; // ← remplacer par ton domaine Cloudflare Pages
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-4-20250514";
+const MODEL = "claude-sonnet-4-6";
 
-// Prompts métier
 const PROMPTS = {
-  summarize: `Tu es un assistant pédagogique expert. Analyse l'image de ce cours et produis une synthèse structurée en JSON strict (sans markdown, sans backticks).
+  summarize: `Tu es un assistant pédagogique expert. Analyse ces images de cours (il peut y en avoir plusieurs pages) et produis une synthèse consolidée en JSON strict (sans markdown, sans backticks).
 Format attendu :
 {
   "title": "Titre du cours détecté",
   "subject": "Matière (Maths, Histoire, etc.)",
-  "summary": "Résumé clair en 3-5 phrases",
+  "summary": "Résumé clair en 3-5 phrases couvrant l'ensemble des pages",
   "key_points": ["point 1", "point 2", "point 3"],
   "difficulty": "facile|moyen|difficile",
   "estimated_read_minutes": 5
@@ -60,20 +57,16 @@ Format attendu :
 Génère un mix de 4 QCM, 3 Vrai/Faux, 3 Texte à trous. Varie les difficultés.`,
 };
 
-// Helper : extraire JSON proprement depuis la réponse Claude
 function extractJSON(text) {
-  // Supprimer éventuels backticks markdown
   const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
   return JSON.parse(cleaned);
 }
 
-// Handler principal
 async function handleRequest(request, env) {
-  // CORS preflight
   if (request.method === "OPTIONS") {
     return new Response(null, {
       headers: {
-        "Access-Control-Allow-Origin": "*", // restreindre en prod si besoin
+        "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, X-Firebase-UID",
         "Access-Control-Max-Age": "86400",
@@ -85,7 +78,6 @@ async function handleRequest(request, env) {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  // Vérifier que l'utilisateur est authentifié (UID Firebase transmis)
   const firebaseUID = request.headers.get("X-Firebase-UID");
   if (!firebaseUID) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -104,7 +96,7 @@ async function handleRequest(request, env) {
     });
   }
 
-  const { action, imageBase64, imageMediaType, summaryText } = body;
+  const { action, images, summaryText } = body;
 
   if (!action || !["summarize", "generate_quiz"].includes(action)) {
     return new Response(JSON.stringify({ error: "Invalid action" }), {
@@ -113,39 +105,38 @@ async function handleRequest(request, env) {
     });
   }
 
-  // Vérifier la taille de l'image (max 4.5MB en base64)
-  if (imageBase64 && imageBase64.length > 6_000_000) {
-    return new Response(JSON.stringify({ error: "Image too large. Max 4.5MB." }), {
-      status: 413,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
   let anthropicMessages;
 
   if (action === "summarize") {
-    if (!imageBase64 || !imageMediaType) {
-      return new Response(JSON.stringify({ error: "Missing image data" }), {
+    // images = tableau de { base64, mediaType }
+    if (!images || !Array.isArray(images) || images.length === 0) {
+      return new Response(JSON.stringify({ error: "Missing images array" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
     }
-    anthropicMessages = [
-      {
-        role: "user",
-        content: [
-          {
-            type: "image",
-            source: {
-              type: "base64",
-              media_type: imageMediaType,
-              data: imageBase64,
-            },
-          },
-          { type: "text", text: PROMPTS.summarize },
-        ],
+    if (images.length > 5) {
+      return new Response(JSON.stringify({ error: "Maximum 5 images allowed" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Construire le contenu avec toutes les images
+    const content = images.map((img) => ({
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: img.mediaType,
+        data: img.base64,
       },
-    ];
+    }));
+
+    // Ajouter le prompt texte après les images
+    content.push({ type: "text", text: PROMPTS.summarize });
+
+    anthropicMessages = [{ role: "user", content }];
+
   } else if (action === "generate_quiz") {
     if (!summaryText) {
       return new Response(JSON.stringify({ error: "Missing summary text" }), {
@@ -176,21 +167,6 @@ async function handleRequest(request, env) {
       }),
     });
 
-    try {
-    const response = await fetch(ANTHROPIC_API, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 2000,
-        messages: anthropicMessages,
-      }),
-    });
-
     const rawBody = await response.text();
 
     if (!response.ok) {
@@ -198,10 +174,7 @@ async function handleRequest(request, env) {
         JSON.stringify({ error: "Anthropic API error", details: rawBody, status: response.status }),
         {
           status: response.status,
-          headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-          },
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
         }
       );
     }
@@ -224,20 +197,18 @@ async function handleRequest(request, env) {
     const parsed = extractJSON(rawText);
 
     return new Response(JSON.stringify({ success: true, data: parsed }), {
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
+
   } catch (err) {
     return new Response(
-      JSON.stringify({ error: "Internal error", message: err.message, stack: err.stack }),
+      JSON.stringify({ error: "Internal error", message: err.message }),
       {
         status: 500,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
       }
     );
   }
+}
+
+export default { fetch: handleRequest };
