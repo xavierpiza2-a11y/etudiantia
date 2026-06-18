@@ -6,8 +6,8 @@
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-sonnet-4-6";
 
-const PROMPTS = {
-  summarize: `Tu es un assistant pédagogique expert. Analyse ces images de cours (il peut y en avoir plusieurs pages) et produis une synthèse consolidée en JSON strict (sans markdown, sans backticks).
+function buildSummarizePrompt() {
+  return `Tu es un assistant pédagogique expert. Analyse ces images de cours (il peut y en avoir plusieurs pages) et produis une synthèse consolidée en JSON strict (sans markdown, sans backticks).
 Format attendu :
 {
   "title": "Titre du cours détecté",
@@ -16,10 +16,22 @@ Format attendu :
   "key_points": ["point 1", "point 2", "point 3"],
   "difficulty": "facile|moyen|difficile",
   "estimated_read_minutes": 5
-}`,
+}`;
+}
 
-  quiz: `Tu es un créateur de quiz pédagogique. À partir de la synthèse fournie, génère exactement 10 questions variées en JSON strict (sans markdown, sans backticks).
-Types disponibles : "qcm", "vrai_faux", "texte_a_trous"
+function buildQuizPrompt(config) {
+  const { total, qcm, vrai_faux, texte_a_trous } = config;
+
+  const typeInstructions = [];
+  if (qcm > 0) typeInstructions.push(`${qcm} questions de type "qcm" (4 choix possibles, une seule bonne réponse)`);
+  if (vrai_faux > 0) typeInstructions.push(`${vrai_faux} questions de type "vrai_faux"`);
+  if (texte_a_trous > 0) typeInstructions.push(`${texte_a_trous} questions de type "texte_a_trous" (utilise ____ pour le trou)`);
+
+  return `Tu es un créateur de quiz pédagogique. À partir de la synthèse fournie, génère exactement ${total} questions en JSON strict (sans markdown, sans backticks).
+
+Répartition obligatoire :
+${typeInstructions.join("\n")}
+
 Format attendu :
 {
   "questions": [
@@ -54,8 +66,8 @@ Format attendu :
     }
   ]
 }
-Génère un mix de 4 QCM, 3 Vrai/Faux, 3 Texte à trous. Varie les difficultés.`,
-};
+Varie les difficultés. Respecte exactement la répartition demandée.`;
+}
 
 function extractJSON(text) {
   const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
@@ -96,7 +108,7 @@ async function handleRequest(request, env) {
     });
   }
 
-  const { action, images, summaryText } = body;
+  const { action, images, summaryText, quizConfig } = body;
 
   if (!action || !["summarize", "generate_quiz"].includes(action)) {
     return new Response(JSON.stringify({ error: "Invalid action" }), {
@@ -108,7 +120,6 @@ async function handleRequest(request, env) {
   let anthropicMessages;
 
   if (action === "summarize") {
-    // images = tableau de { base64, mediaType }
     if (!images || !Array.isArray(images) || images.length === 0) {
       return new Response(JSON.stringify({ error: "Missing images array" }), {
         status: 400,
@@ -122,19 +133,11 @@ async function handleRequest(request, env) {
       });
     }
 
-    // Construire le contenu avec toutes les images
     const content = images.map((img) => ({
       type: "image",
-      source: {
-        type: "base64",
-        media_type: img.mediaType,
-        data: img.base64,
-      },
+      source: { type: "base64", media_type: img.mediaType, data: img.base64 },
     }));
-
-    // Ajouter le prompt texte après les images
-    content.push({ type: "text", text: PROMPTS.summarize });
-
+    content.push({ type: "text", text: buildSummarizePrompt() });
     anthropicMessages = [{ role: "user", content }];
 
   } else if (action === "generate_quiz") {
@@ -144,12 +147,22 @@ async function handleRequest(request, env) {
         headers: { "Content-Type": "application/json" },
       });
     }
-    anthropicMessages = [
-      {
-        role: "user",
-        content: `Voici la synthèse du cours :\n${summaryText}\n\n${PROMPTS.quiz}`,
-      },
-    ];
+
+    // Config par défaut si non fournie
+    const config = quizConfig || { total: 10, qcm: 4, vrai_faux: 3, texte_a_trous: 3 };
+
+    // Validation serveur
+    if (config.qcm + config.vrai_faux + config.texte_a_trous !== config.total) {
+      return new Response(JSON.stringify({ error: "Quiz config totals don't match" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    anthropicMessages = [{
+      role: "user",
+      content: `Voici la synthèse du cours :\n${summaryText}\n\n${buildQuizPrompt(config)}`,
+    }];
   }
 
   try {
@@ -162,7 +175,7 @@ async function handleRequest(request, env) {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 2000,
+        max_tokens: 4000,
         messages: anthropicMessages,
       }),
     });
@@ -172,10 +185,7 @@ async function handleRequest(request, env) {
     if (!response.ok) {
       return new Response(
         JSON.stringify({ error: "Anthropic API error", details: rawBody, status: response.status }),
-        {
-          status: response.status,
-          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-        }
+        { status: response.status, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
       );
     }
 
@@ -203,10 +213,7 @@ async function handleRequest(request, env) {
   } catch (err) {
     return new Response(
       JSON.stringify({ error: "Internal error", message: err.message }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-      }
+      { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
     );
   }
 }

@@ -95,18 +95,43 @@ export default function App() {
     setPage("course");
   };
 
-  const handleStartQuiz = async () => {
-    if (!activeCourse?.quizId || !user?.uid) return;
+  // Générer et charger le quiz avec la config choisie
+  const handleStartQuiz = async (quizConfig) => {
+    if (!activeCourse?.courseId || !user?.uid) return;
     try {
-      const quizSnap = await getDoc(
-        doc(db, "users", user.uid, "quizzes", activeCourse.quizId)
-      );
-      if (quizSnap.exists()) {
-        setActiveQuiz({ quizId: activeCourse.quizId, questions: quizSnap.data().questions });
-        setPage("quiz");
-      }
+      // Générer le quiz via le Worker avec la config
+      const res = await fetch(`${import.meta.env.VITE_WORKER_URL}/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Firebase-UID": user.uid,
+        },
+        body: JSON.stringify({
+          action: "generate_quiz",
+          summaryText: JSON.stringify(activeCourse.summary),
+          quizConfig,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Erreur quiz");
+
+      // Sauvegarder en Firestore
+      const { addDoc, collection, serverTimestamp, doc, updateDoc } = await import("firebase/firestore");
+      const quizRef = await addDoc(collection(db, "users", user.uid, "quizzes"), {
+        questions: json.data.questions,
+        courseId: activeCourse.courseId,
+        config: quizConfig,
+        createdAt: serverTimestamp(),
+      });
+      await updateDoc(doc(db, "users", user.uid, "courses", activeCourse.courseId), {
+        quizId: quizRef.id,
+        status: "ready",
+      });
+
+      setActiveQuiz({ quizId: quizRef.id, questions: json.data.questions });
+      setPage("quiz");
     } catch (e) {
-      console.error("Erreur chargement quiz:", e);
+      console.error("Erreur génération quiz:", e);
     }
   };
 

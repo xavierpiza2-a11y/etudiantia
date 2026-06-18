@@ -1,5 +1,5 @@
 // src/components/Upload.jsx
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
 import { storage, db } from "../firebase/config";
@@ -34,6 +34,32 @@ function compressImage(file, maxDimension = MAX_IMAGE_DIMENSION) {
   });
 }
 
+function compressBlob(blob, maxDimension = MAX_IMAGE_DIMENSION) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(blob);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement("canvas");
+      let { width, height } = img;
+      if (width > maxDimension || height > maxDimension) {
+        const ratio = Math.min(maxDimension / width, maxDimension / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (b) => b ? resolve(b) : reject(new Error("Compression failed")),
+        "image/jpeg", 0.82
+      );
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -53,45 +79,160 @@ const STEP_LABELS = {
   error: "Une erreur est survenue",
 };
 
+// ── Composant Caméra ─────────────────────────────────
+function CameraCapture({ onCapture, onClose }) {
+  const videoRef = useRef();
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let stream;
+    const start = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
+        });
+        videoRef.current.srcObject = stream;
+        setReady(true);
+      } catch (e) {
+        setError("Impossible d'accéder à la caméra : " + e.message);
+      }
+    };
+    start();
+    return () => {
+      stream?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
+
+  const capture = () => {
+    const video = videoRef.current;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    canvas.toBlob((blob) => {
+      if (blob) onCapture(blob);
+    }, "image/jpeg", 0.92);
+  };
+
+  return (
+    <div className="camera-overlay">
+      <div className="camera-modal">
+        <div className="camera-header">
+          <span className="camera-title">📷 Appareil photo</span>
+          <button className="camera-close" onClick={onClose}>✕</button>
+        </div>
+        {error ? (
+          <div className="camera-error">
+            <p>{error}</p>
+            <button className="btn-reset" onClick={onClose}>Fermer</button>
+          </div>
+        ) : (
+          <>
+            <div className="camera-viewfinder">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="camera-video"
+              />
+              {!ready && <div className="camera-loading">Démarrage de la caméra…</div>}
+              <div className="camera-frame" />
+            </div>
+            <div className="camera-controls">
+              <button
+                className="camera-shutter"
+                onClick={capture}
+                disabled={!ready}
+                aria-label="Prendre la photo"
+              >
+                <div className="shutter-inner" />
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Composant principal Upload ───────────────────────
 export default function Upload({ user, onComplete }) {
   const [step, setStep] = useState("idle");
-  const [previews, setPreviews] = useState([]); // URLs de prévisualisation
+  const [capturedBlobs, setCapturedBlobs] = useState([]); // Blobs des images
+  const [previews, setPreviews] = useState([]);            // URLs de préview
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState(null);
   const [dragOver, setDragOver] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
   const fileInputRef = useRef();
 
-  const processFiles = useCallback(async (files) => {
-    setError(null);
-
-    // Validation
+  // Ajouter des fichiers à la sélection
+  const addFiles = useCallback((files) => {
     const validFiles = Array.from(files).filter(f => f.type.startsWith("image/"));
-    if (validFiles.length === 0) {
-      setError("Aucune image valide sélectionnée.");
-      return;
-    }
-    if (validFiles.length > MAX_FILES) {
-      setError(`Maximum ${MAX_FILES} images à la fois.`);
-      return;
-    }
+    if (!validFiles.length) return;
 
-    // Prévisualisations
-    const objectURLs = validFiles.map(f => URL.createObjectURL(f));
-    setPreviews(objectURLs);
+    setCapturedBlobs(prev => {
+      const next = [...prev, ...validFiles].slice(0, MAX_FILES);
+      // Mettre à jour les previews
+      const urls = next.map(f => URL.createObjectURL(f));
+      setPreviews(old => { old.forEach(u => URL.revokeObjectURL(u)); return urls; });
+      return next;
+    });
+    setError(null);
+  }, []);
+
+  // Ajouter une photo prise par la caméra
+  const handleCameraCapture = useCallback((blob) => {
+    setCapturedBlobs(prev => {
+      if (prev.length >= MAX_FILES) return prev;
+      const next = [...prev, blob];
+      const urls = next.map(b => URL.createObjectURL(b));
+      setPreviews(old => { old.forEach(u => URL.revokeObjectURL(u)); return urls; });
+      return next;
+    });
+    setShowCamera(false);
+  }, []);
+
+  // Supprimer une image de la sélection
+  const removeImage = (index) => {
+    setCapturedBlobs(prev => {
+      const next = prev.filter((_, i) => i !== index);
+      const urls = next.map(b => URL.createObjectURL(b));
+      setPreviews(old => { old.forEach(u => URL.revokeObjectURL(u)); return urls; });
+      return next;
+    });
+  };
+
+  const handleFileChange = (e) => {
+    if (e.target.files?.length) addFiles(e.target.files);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files);
+  };
+
+  // Lancer l'analyse
+  const handleAnalyze = useCallback(async () => {
+    if (!capturedBlobs.length) return;
+    setError(null);
     setStep("compressing");
     setProgress(10);
 
-    // Compression de toutes les images
+    // Compression
     let compressedBlobs;
     try {
-      compressedBlobs = await Promise.all(validFiles.map(f => compressImage(f)));
+      compressedBlobs = await Promise.all(capturedBlobs.map(b => compressBlob(b)));
     } catch (e) {
       setError("Erreur compression : " + e.message);
       setStep("error");
       return;
     }
 
-    // Upload toutes les images sur Firebase Storage
+    // Upload Firebase Storage
     setStep("uploading");
     setProgress(25);
     let downloadURLs;
@@ -109,13 +250,13 @@ export default function Upload({ user, onComplete }) {
       return;
     }
 
-    // Créer le doc Firestore
+    // Créer doc Firestore
     let courseRef;
     try {
       courseRef = await addDoc(collection(db, "users", user.uid, "courses"), {
-        imageURL: downloadURLs[0],      // image principale pour la vignette
-        imageURLs: downloadURLs,        // toutes les images
-        pageCount: validFiles.length,
+        imageURL: downloadURLs[0],
+        imageURLs: downloadURLs,
+        pageCount: compressedBlobs.length,
         status: "processing",
         createdAt: serverTimestamp(),
       });
@@ -125,7 +266,7 @@ export default function Upload({ user, onComplete }) {
       return;
     }
 
-    // Préparer toutes les images en base64 pour le Worker
+    // Analyse Claude
     setStep("summarizing");
     setProgress(45);
     let summary;
@@ -136,123 +277,145 @@ export default function Upload({ user, onComplete }) {
           mediaType: "image/jpeg",
         }))
       );
-
       const res = await fetch(`${WORKER_URL}/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Firebase-UID": user.uid,
-        },
-        body: JSON.stringify({
-          action: "summarize",
-          images: imagesPayload,
-        }),
+        headers: { "Content-Type": "application/json", "X-Firebase-UID": user.uid },
+        body: JSON.stringify({ action: "summarize", images: imagesPayload }),
       });
-
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || "Erreur résumé");
       summary = json.data;
     } catch (e) {
-      setError("Erreur analyse du cours : " + e.message);
+      setError("Erreur analyse : " + e.message);
       setStep("error");
       return;
     }
 
     await updateDoc(courseRef, { summary, status: "summarized" });
-    setProgress(65);
+    setProgress(70);
 
-    // Génération du quiz
-    setStep("generating_quiz");
-    setProgress(75);
-    let quizData;
+    // Sauvegarder sans quiz (le quiz sera généré après config)
     try {
-      const res = await fetch(`${WORKER_URL}/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Firebase-UID": user.uid,
-        },
-        body: JSON.stringify({
-          action: "generate_quiz",
-          summaryText: JSON.stringify(summary),
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error || "Erreur quiz");
-      quizData = json.data;
+      await updateDoc(courseRef, { status: "ready_for_quiz" });
     } catch (e) {
-      setError("Erreur génération du quiz : " + e.message);
-      setStep("error");
-      return;
-    }
-
-    // Sauvegarder le quiz
-    let quizRef;
-    try {
-      quizRef = await addDoc(collection(db, "users", user.uid, "quizzes"), {
-        questions: quizData.questions,
-        courseId: courseRef.id,
-        createdAt: serverTimestamp(),
-      });
-      await updateDoc(courseRef, { quizId: quizRef.id, status: "ready" });
-    } catch (e) {
-      setError("Erreur sauvegarde quiz : " + e.message);
-      setStep("error");
-      return;
+      console.error(e);
     }
 
     setProgress(100);
     setStep("done");
-
-    // Nettoyer les object URLs
-    objectURLs.forEach(url => URL.revokeObjectURL(url));
+    previews.forEach(u => URL.revokeObjectURL(u));
 
     setTimeout(() => {
       onComplete({
         courseId: courseRef.id,
-        quizId: quizRef.id,
         summary,
         imageURL: downloadURLs[0],
+        needsQuizConfig: true, // signal pour afficher la config
       });
     }, 800);
 
-  }, [user, onComplete]);
-
-  const handleFileChange = (e) => {
-    if (e.target.files?.length) processFiles(e.target.files);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setDragOver(false);
-    if (e.dataTransfer.files?.length) processFiles(e.dataTransfer.files);
-  };
+  }, [capturedBlobs, user, onComplete, previews]);
 
   const handleReset = () => {
+    previews.forEach(u => URL.revokeObjectURL(u));
     setStep("idle");
+    setCapturedBlobs([]);
     setPreviews([]);
     setProgress(0);
     setError(null);
   };
 
+  const isProcessing = !["idle", "error"].includes(step);
+
   return (
     <div className="upload-container">
-      {step === "idle" || step === "error" ? (
-        <div
-          className={`drop-zone ${dragOver ? "drag-over" : ""}`}
-          onClick={() => fileInputRef.current?.click()}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
-        >
-          <div className="drop-zone-icon">📸</div>
-          <p className="drop-zone-title">Prends en photo ton cours</p>
-          <p className="drop-zone-sub">ou glisse-dépose tes images ici</p>
-          <p className="drop-zone-hint">JPG, PNG, WEBP · max {MAX_FILES} pages · 4.5 MB chacune</p>
+      {showCamera && (
+        <CameraCapture
+          onCapture={handleCameraCapture}
+          onClose={() => setShowCamera(false)}
+        />
+      )}
+
+      {!isProcessing ? (
+        <div className="upload-panel">
+          {/* Zone de drop */}
+          <div
+            className={`drop-zone ${dragOver ? "drag-over" : ""} ${capturedBlobs.length > 0 ? "has-images" : ""}`}
+            onClick={() => capturedBlobs.length < MAX_FILES && fileInputRef.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
+          >
+            {capturedBlobs.length === 0 ? (
+              <>
+                <div className="drop-zone-icon">📄</div>
+                <p className="drop-zone-title">Glisse tes images ici</p>
+                <p className="drop-zone-sub">ou utilise les boutons ci-dessous</p>
+                <p className="drop-zone-hint">JPG, PNG, WEBP · max {MAX_FILES} pages</p>
+              </>
+            ) : (
+              <div className={`previews-grid previews-${Math.min(capturedBlobs.length, 5)}`}>
+                {previews.map((url, i) => (
+                  <div key={i} className="preview-item">
+                    <img src={url} alt={`Page ${i + 1}`} className="preview-thumb" />
+                    <button
+                      className="preview-remove"
+                      onClick={(e) => { e.stopPropagation(); removeImage(i); }}
+                      aria-label={`Supprimer page ${i + 1}`}
+                    >
+                      ✕
+                    </button>
+                    <span className="preview-label">Page {i + 1}</span>
+                  </div>
+                ))}
+                {capturedBlobs.length < MAX_FILES && (
+                  <div className="preview-add" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
+                    <span>+</span>
+                    <span className="preview-add-label">Ajouter</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Boutons d'action */}
+          <div className="upload-actions">
+            <button
+              className="btn-camera"
+              onClick={() => setShowCamera(true)}
+              disabled={capturedBlobs.length >= MAX_FILES}
+            >
+              📷 Caméra
+            </button>
+            <button
+              className="btn-file"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={capturedBlobs.length >= MAX_FILES}
+            >
+              🖼️ Fichier
+            </button>
+            {capturedBlobs.length > 0 && (
+              <button className="btn-reset-sm" onClick={handleReset}>
+                🗑 Tout effacer
+              </button>
+            )}
+          </div>
+
+          <p className="upload-count">
+            {capturedBlobs.length} / {MAX_FILES} page{capturedBlobs.length > 1 ? "s" : ""}
+          </p>
+
           {error && <p className="upload-error">{error}</p>}
+
+          {capturedBlobs.length > 0 && (
+            <button className="btn-analyze" onClick={handleAnalyze}>
+              Analyser {capturedBlobs.length > 1 ? `les ${capturedBlobs.length} pages` : "la page"} →
+            </button>
+          )}
+
           <input
             ref={fileInputRef}
             type="file"
@@ -264,15 +427,13 @@ export default function Upload({ user, onComplete }) {
         </div>
       ) : (
         <div className="processing-card">
-          {/* Grille de prévisualisations */}
           {previews.length > 0 && (
-            <div className={`previews-grid previews-${previews.length}`}>
+            <div className={`previews-grid previews-${Math.min(previews.length, 5)}`}>
               {previews.map((url, i) => (
                 <img key={i} src={url} alt={`Page ${i + 1}`} className="preview-thumb" />
               ))}
             </div>
           )}
-
           <div className="processing-info">
             <div className="processing-header">
               <p className="processing-label">{STEP_LABELS[step]}</p>
@@ -291,11 +452,6 @@ export default function Upload({ user, onComplete }) {
               />
             </div>
             <p className="progress-pct">{progress}%</p>
-            {step === "error" && (
-              <button className="btn-reset" onClick={handleReset}>
-                Réessayer
-              </button>
-            )}
           </div>
         </div>
       )}
