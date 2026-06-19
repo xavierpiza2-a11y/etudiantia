@@ -1,10 +1,7 @@
 // src/firebase/config.js
-// ⚠️  Remplace ces valeurs par celles de ta console Firebase
-// https://console.firebase.google.com → Paramètres du projet → Vos applications
-
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -23,24 +20,26 @@ export const googleProvider = new GoogleAuthProvider();
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
+// Log une connexion utilisateur dans connectionLogs
+export async function logConnection(user) {
+  try {
+    await addDoc(collection(db, "connectionLogs"), {
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName,
+      timestamp: serverTimestamp(),
+      userAgent: navigator.userAgent,
+      language: navigator.language,
+    });
+  } catch (e) {
+    console.error("Erreur log connexion:", e);
+  }
+}
+
 // Structure Firestore :
 // users/{uid}/
 //   courses/{courseId}/
-//     - imageURL: string
-//     - summary: object
-//     - createdAt: timestamp
-//     - quizId: string
 //   quizzes/{quizId}/
-//     - questions: array
-//     - courseId: string
 //   results/{resultId}/
-//     - quizId: string
-//     - score: number
-//     - maxScore: number
-//     - answers: array
-//     - completedAt: timestamp
-//   profile/
-//     - xp: number
-//     - level: number
-//     - badges: array
-//     - streak: number
+//   profile/main → { xp, level, badges, streak, totalQuizzes, disabled }
+// connectionLogs/{logId} → { uid, email, displayName, timestamp, userAgent, language }

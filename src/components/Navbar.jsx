@@ -2,13 +2,17 @@
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase/config";
 import { getLevelFromXP } from "../hooks/useXP";
+import { isAdminUser } from "../hooks/useAdmin";
 
 export default function Navbar({ user, profile, currentPage, onNavigate }) {
   const levelInfo = profile ? getLevelFromXP(profile.xp || 0) : null;
 
   const handleSignOut = async () => {
-    try { await signOut(auth); }
-    catch (e) { console.error("Erreur déconnexion:", e); }
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.error("Erreur déconnexion:", e);
+    }
   };
 
   return (
@@ -19,15 +23,32 @@ export default function Navbar({ user, profile, currentPage, onNavigate }) {
       </div>
 
       <div className="navbar-links">
-        <button className={`nav-link ${currentPage === "home" ? "active" : ""}`} onClick={() => onNavigate("home")}>
+        <button
+          className={`nav-link ${currentPage === "home" ? "active" : ""}`}
+          onClick={() => onNavigate("home")}
+        >
           🏠 Accueil
         </button>
-        <button className={`nav-link ${currentPage === "courses" ? "active" : ""}`} onClick={() => onNavigate("courses")}>
+        <button
+          className={`nav-link ${currentPage === "courses" ? "active" : ""}`}
+          onClick={() => onNavigate("courses")}
+        >
           📚 Mes cours
         </button>
-        <button className={`nav-link ${currentPage === "dashboard" ? "active" : ""}`} onClick={() => onNavigate("dashboard")}>
+        <button
+          className={`nav-link ${currentPage === "dashboard" ? "active" : ""}`}
+          onClick={() => onNavigate("dashboard")}
+        >
           📊 Progression
         </button>
+        {isAdminUser(user) && (
+          <button
+            className={`nav-link admin-link ${currentPage === "admin" ? "active" : ""}`}
+            onClick={() => onNavigate("admin")}
+          >
+            🛠️ Admin
+          </button>
+        )}
       </div>
 
       <div className="navbar-right">
@@ -44,8 +65,15 @@ export default function Navbar({ user, profile, currentPage, onNavigate }) {
         )}
         {user && (
           <div className="navbar-user">
-            <img src={user.photoURL} alt={user.displayName} className="navbar-avatar" referrerPolicy="no-referrer" />
-            <button className="btn-signout" onClick={handleSignOut} title="Se déconnecter">↩</button>
+            <img
+              src={user.photoURL}
+              alt={user.displayName}
+              className="navbar-avatar"
+              referrerPolicy="no-referrer"
+            />
+            <button className="btn-signout" onClick={handleSignOut} title="Se déconnecter">
+              ↩
+            </button>
           </div>
         )}
       </div>
