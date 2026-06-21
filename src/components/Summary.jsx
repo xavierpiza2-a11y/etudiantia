@@ -1,5 +1,5 @@
 // src/components/Summary.jsx
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const DIFFICULTY_META = {
   facile:    { label: "Facile",    color: "#10B981" },
@@ -34,7 +34,46 @@ function Counter({ label, icon, value, onChange, max }) {
   );
 }
 
-export default function Summary({ summary, imageURL, onStartQuiz }) {
+// Barre de progression simulée pendant la génération du quiz
+// (l'API ne donne pas de progression réelle, on simule une avancée crédible)
+function QuizGeneratingProgress({ total }) {
+  const [progress, setProgress] = useState(5);
+  const intervalRef = useRef();
+
+  useEffect(() => {
+    // Progression non-linéaire : rapide au début, ralentit vers 90%
+    intervalRef.current = setInterval(() => {
+      setProgress((p) => {
+        if (p >= 92) return p;
+        const remaining = 92 - p;
+        const step = Math.max(0.5, remaining * 0.08);
+        return Math.min(92, p + step);
+      });
+    }, 200);
+    return () => clearInterval(intervalRef.current);
+  }, []);
+
+  return (
+    <div className="quiz-generating">
+      <div className="quiz-generating-icon">🧠</div>
+      <p className="quiz-generating-title">Claude génère ton quiz…</p>
+      <p className="quiz-generating-sub">{total} questions en préparation</p>
+      <div className="progress-bar-track generating-track">
+        <div
+          className="progress-bar-fill"
+          style={{ width: `${progress}%` }}
+          role="progressbar"
+          aria-valuenow={Math.round(progress)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        />
+      </div>
+      <p className="progress-pct">{Math.round(progress)}%</p>
+    </div>
+  );
+}
+
+export default function Summary({ summary, imageURL, onStartQuiz, generating }) {
   const [showConfig, setShowConfig] = useState(false);
   const [qcm, setQcm] = useState(4);
   const [vraiFaux, setVraiFaux] = useState(3);
@@ -60,7 +99,7 @@ export default function Summary({ summary, imageURL, onStartQuiz }) {
   };
 
   const handleGenerate = () => {
-    if (!isValid) return;
+    if (!isValid || generating) return;
     onStartQuiz({ qcm, vrai_faux: vraiFaux, texte_a_trous: texteTrous, total });
   };
 
@@ -96,7 +135,9 @@ export default function Summary({ summary, imageURL, onStartQuiz }) {
         </ul>
       </div>
 
-      {!showConfig ? (
+      {generating ? (
+        <QuizGeneratingProgress total={total} />
+      ) : !showConfig ? (
         <button className="btn-start-quiz" onClick={() => setShowConfig(true)}>
           Configurer le quiz ⚙️
         </button>
@@ -105,27 +146,9 @@ export default function Summary({ summary, imageURL, onStartQuiz }) {
           <h3 className="config-title">⚙️ Configurer le quiz</h3>
 
           <div className="counters-list">
-            <Counter
-              label="QCM"
-              icon="🎯"
-              value={qcm}
-              onChange={setQcm}
-              max={MAX_QUESTIONS}
-            />
-            <Counter
-              label="Vrai / Faux"
-              icon="⚡"
-              value={vraiFaux}
-              onChange={setVraiFaux}
-              max={MAX_QUESTIONS}
-            />
-            <Counter
-              label="Texte à trous"
-              icon="✍️"
-              value={texteTrous}
-              onChange={setTexteTrous}
-              max={MAX_QUESTIONS}
-            />
+            <Counter label="QCM" icon="🎯" value={qcm} onChange={setQcm} max={MAX_QUESTIONS} />
+            <Counter label="Vrai / Faux" icon="⚡" value={vraiFaux} onChange={setVraiFaux} max={MAX_QUESTIONS} />
+            <Counter label="Texte à trous" icon="✍️" value={texteTrous} onChange={setTexteTrous} max={MAX_QUESTIONS} />
           </div>
 
           <div className="config-total" style={{ color: getStatusColor() }}>
@@ -136,11 +159,7 @@ export default function Summary({ summary, imageURL, onStartQuiz }) {
             <button className="btn-config-cancel" onClick={() => setShowConfig(false)}>
               ← Retour
             </button>
-            <button
-              className="btn-generate-quiz"
-              onClick={handleGenerate}
-              disabled={!isValid}
-            >
+            <button className="btn-generate-quiz" onClick={handleGenerate} disabled={!isValid}>
               Générer le quiz 🚀
             </button>
           </div>

@@ -110,8 +110,11 @@ export default function App() {
   };
 
   // Générer le quiz avec la config choisie par l'utilisateur (nb par type)
+  const [generatingQuiz, setGeneratingQuiz] = useState(false);
+
   const handleStartQuiz = async (quizConfig) => {
     if (!activeCourse?.courseId || !user?.uid) return;
+    setGeneratingQuiz(true);
     try {
       const res = await fetch(`${import.meta.env.VITE_WORKER_URL}/`, {
         method: "POST",
@@ -143,6 +146,8 @@ export default function App() {
       setPage("quiz");
     } catch (e) {
       console.error("Erreur génération quiz:", e);
+    } finally {
+      setGeneratingQuiz(false);
     }
   };
 
@@ -243,6 +248,7 @@ export default function App() {
             summary={activeCourse.summary}
             imageURL={activeCourse.imageURL}
             onStartQuiz={activeCourse.quizId ? handleLoadExistingQuiz : handleStartQuiz}
+            generating={generatingQuiz}
           />
         )}
 
