@@ -796,6 +796,14 @@ body {
   padding: 8px 14px; font-size: 0.8rem; color: var(--text-muted);
   background: rgba(245,158,11,0.08); border-top: 1px solid var(--border);
 }
+.course-card-status {
+  padding: 7px 14px; font-size: 0.76rem; color: var(--green);
+  background: rgba(16,185,129,0.08); border-top: 1px solid var(--border);
+  font-weight: 600;
+}
+.course-card-status.status-pending {
+  color: var(--gold); background: rgba(245,158,11,0.08);
+}
 .empty-courses {
   text-align: center; padding: 60px 20px;
   background: var(--bg-card); border: 1px solid var(--border);

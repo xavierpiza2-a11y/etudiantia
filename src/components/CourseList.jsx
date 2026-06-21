@@ -9,6 +9,16 @@ const DIFFICULTY_META = {
   difficile: { label: "Difficile", color: "#EF4444" },
 };
 
+// Statuts considérés comme cliquables (le cours peut être ouvert)
+const CLICKABLE_STATUSES = ["ready", "ready_for_quiz", "summarized"];
+
+const STATUS_LABELS = {
+  processing: "⏳ Analyse en cours…",
+  summarized: "✅ Synthèse prête",
+  ready_for_quiz: "⚙️ Quiz à configurer",
+  ready: "🎯 Quiz prêt",
+};
+
 export default function CourseList({ user, onOpenCourse }) {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,12 +65,14 @@ export default function CourseList({ user, onOpenCourse }) {
       <div className="course-grid">
         {courses.map((course) => {
           const diff = DIFFICULTY_META[course.summary?.difficulty] || DIFFICULTY_META.moyen;
-          const isReady = course.status === "ready";
+          const isClickable = CLICKABLE_STATUSES.includes(course.status);
+          const needsConfig = course.status === "ready_for_quiz" || course.status === "summarized";
+
           return (
             <div
               key={course.id}
-              className={`course-card ${isReady ? "clickable" : "processing"}`}
-              onClick={() => isReady && onOpenCourse(course)}
+              className={`course-card ${isClickable ? "clickable" : "processing"}`}
+              onClick={() => isClickable && onOpenCourse(course)}
             >
               {course.imageURL && (
                 <img src={course.imageURL} alt="" className="course-card-img" />
@@ -88,7 +100,8 @@ export default function CourseList({ user, onOpenCourse }) {
                     : "—"}
                 </p>
               </div>
-              {isReady && (
+
+              {isClickable && (
                 <button
                   className="course-delete-btn"
                   onClick={(e) => handleDelete(e, course.id)}
@@ -97,9 +110,11 @@ export default function CourseList({ user, onOpenCourse }) {
                   🗑
                 </button>
               )}
-              {!isReady && (
-                <div className="course-card-processing">⏳ En cours…</div>
-              )}
+
+              {/* Badge de statut */}
+              <div className={`course-card-status ${needsConfig ? "status-pending" : ""}`}>
+                {STATUS_LABELS[course.status] || "⏳ En cours…"}
+              </div>
             </div>
           );
         })}
