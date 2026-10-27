@@ -1,0 +1,15 @@
+services:
+  etudiantia:
+    build: .
+    image: etudiantia:local
+    container_name: etudiantia
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-8080}:3000"
+    env_file: .env
+    environment:
+      TZ: ${TZ:-Europe/Paris}
+    volumes:
+      # Toutes les données (images, résumés, quiz, profils, cache IA) vivent ici.
+      # Ce dossier n'est jamais touché par les mises à jour.
+      - ./data:/data
