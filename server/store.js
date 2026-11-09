@@ -153,6 +153,7 @@ export async function initDataDir() {
     "results",
     "cache/summaries",
     "cache/quizzes",
+    "img",
   ];
   await fs.mkdir(config.dataDir, { recursive: true });
   for (const d of dirs) await fs.mkdir(path.join(config.dataDir, d), { recursive: true });

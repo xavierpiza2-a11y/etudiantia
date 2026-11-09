@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { api, SESSION_INVALID_EVENT } from "./lib/api";
 import { BADGES } from "./hooks/useXP";
+import { Img, Mascot, SceneBackground } from "./lib/images";
 import KeyScreen from "./components/KeyScreen";
 import ProfileSelect from "./components/ProfileSelect";
 import Navbar from "./components/Navbar";
@@ -26,7 +27,7 @@ function XPToast({ gain, badges = [], onDone }) {
       <span>+{gain} XP</span>
       {earned.map((b) => (
         <span key={b.id} className="xp-toast-badge" title={b.desc}>
-          {b.icon} {b.name}
+          <Img name={`badge_${b.id}`} fallback={b.icon} size={26} /> {b.name}
         </span>
       ))}
     </div>
@@ -42,6 +43,7 @@ export default function App() {
   const [xpToast, setXPToast] = useState(null);
   const [generatingQuiz, setGeneratingQuiz] = useState(false);
   const [quizError, setQuizError] = useState(null);
+  const [quizScene, setQuizScene] = useState("quiz"); // "quiz" | "results"
 
   const resetNavigation = () => {
     setPage("home");
@@ -157,50 +159,68 @@ export default function App() {
   // ── Rendu ────────────────────────────────────────────────────────────────
   if (!session) {
     return (
-      <div className="splash">
-        <div className="splash-logo">🎓</div>
-        <div className="splash-spinner" />
-      </div>
+      <>
+        <SceneBackground scene="login" />
+        <div className="splash">
+          <Mascot mood="think" size={110} />
+          <div className="splash-spinner" />
+        </div>
+      </>
     );
   }
 
   if (!session.authenticated) {
-    return <KeyScreen onSuccess={refreshSession} />;
+    return (
+      <>
+        <SceneBackground scene="login" />
+        <KeyScreen onSuccess={refreshSession} />
+      </>
+    );
   }
 
   if (!session.profile) {
     return (
-      <ProfileSelect
-        canCreate={session.canCreateProfiles}
-        onSelected={async () => {
-          resetNavigation();
-          await refreshSession();
-        }}
-        onLogout={handleLogout}
-      />
+      <>
+        <SceneBackground scene="login" />
+        <ProfileSelect
+          canCreate={session.canCreateProfiles}
+          onSelected={async () => {
+            resetNavigation();
+            await refreshSession();
+          }}
+          onLogout={handleLogout}
+        />
+      </>
     );
   }
 
   // Profil désactivé par l'administrateur → blocage total
   if (profile?.disabled) {
     return (
-      <div className="disabled-screen">
-        <div className="disabled-card">
-          <div className="disabled-icon">🚫</div>
-          <h2>Profil désactivé</h2>
-          <p>Ce profil a été suspendu. Contacte l'administrateur pour plus d'informations.</p>
-          <button className="btn-reset" onClick={handleSwitchProfile}>Changer de profil</button>
+      <>
+        <SceneBackground scene="login" />
+        <div className="disabled-screen">
+          <div className="disabled-card">
+            <Mascot mood="sad" size={120} />
+            <h2>Profil désactivé</h2>
+            <p>Ce profil a été suspendu. Contacte l'administrateur pour plus d'informations.</p>
+            <button className="btn-reset" onClick={handleSwitchProfile}>Changer de profil</button>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
+  const scene = page === "quiz" ? quizScene : "home";
+
   return (
-    <div className="app">
+    <div className="app" data-focus={page === "quiz"}>
+      <SceneBackground scene={scene} />
       <Navbar
         profile={profile}
         adminEnabled={session.adminEnabled}
         currentPage={page}
+        focus={page === "quiz"}
         onNavigate={handleNavigate}
         onSwitchProfile={handleSwitchProfile}
         onLogout={handleLogout}
@@ -210,6 +230,12 @@ export default function App() {
         {page === "home" && (
           <div className="home-page">
             <div className="home-hero">
+              <div className="mascot-hero">
+                <Mascot mood="happy" size={118} />
+                <div className="speech">
+                  Salut <strong>{profile.name}</strong> ! On révise quoi aujourd'hui ?
+                </div>
+              </div>
               <h1 className="hero-title">Scanne. Révise. <span className="hero-accent">Progresse.</span></h1>
               <p className="hero-sub">Prends en photo ton cours et laisse l'IA créer ton quiz personnalisé.</p>
             </div>
@@ -238,6 +264,7 @@ export default function App() {
             questions={activeQuiz.questions}
             onActivity={handleActivity}
             onHome={handleHome}
+            onScene={setQuizScene}
           />
         )}
 

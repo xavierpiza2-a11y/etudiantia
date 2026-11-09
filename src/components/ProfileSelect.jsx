@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { getLevelFromXP } from "../hooks/useXP";
+import { Img, Mascot } from "../lib/images";
 
 const AVATARS = ["🦊", "🐼", "🦁", "🐯", "🐨", "🐸", "🦄", "🐙", "🦉", "🐧", "🐢", "🦖"];
 
@@ -66,6 +67,7 @@ export default function ProfileSelect({ canCreate, onSelected, onLogout }) {
 
   return (
     <div className="profiles-screen">
+      <Mascot mood="happy" size={110} />
       <h1 className="profiles-title">Qui révise aujourd'hui ?</h1>
 
       {error && <p className="login-error" role="alert">{error}</p>}
@@ -85,7 +87,7 @@ export default function ProfileSelect({ canCreate, onSelected, onLogout }) {
                 <span className="profile-avatar">{busyId === p.id ? "⏳" : p.avatar}</span>
                 <span className="profile-name">{p.name}</span>
                 <span className="profile-level">
-                  {p.disabled ? "🚫 Désactivé" : `${lvl.icon} Niv. ${lvl.level} · ${p.xp} XP`}
+                  {p.disabled ? "🚫 Désactivé" : `Niv. ${lvl.level} · ${p.xp} XP`}
                 </span>
               </button>
             );

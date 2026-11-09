@@ -24,6 +24,7 @@ Compte environ **30 à 45 minutes** la première fois (la plus grande partie est
 13. [Commandes utiles au quotidien](#13-commandes-utiles-au-quotidien)
 14. [Accès depuis l'extérieur (optionnel)](#14-accès-depuis-lextérieur-optionnel)
 15. [Dépannage](#15-dépannage)
+16. [Personnaliser l'apparence (images IA) et installer sur l'écran d'accueil](#16-personnaliser-lapparence-images-ia-et-installer-sur-lécran-daccueil)
 
 ---
 
@@ -244,7 +245,9 @@ Active enfin la **mise à jour automatique** (voir section 11) :
 4. **Quiz** : choisis le nombre de QCM / Vrai-Faux / Textes à trous, puis lance.
 5. **Mes cours** : rouvre un cours et son quiz **sans aucun appel IA**. Le bouton « Générer un autre quiz » fait, lui, un nouvel appel.
 6. **Progression** : XP, niveaux, badges, série de jours.
-7. **Admin** : onglet 🛠️ Admin → saisis `ADMIN_PIN` (déverrouillage de 30 minutes).
+7. **Admin** : onglet **Profil** (en bas à droite) → **🛠️ Administration** → saisis `ADMIN_PIN` (déverrouillage de 30 minutes).
+
+**Navigation sur téléphone** : la barre du bas donne accès à *Accueil*, *Cours*, *Progrès* et *Profil* (changer de profil, administration, verrouiller). Pendant un quiz, elle disparaît pour éviter les fausses manœuvres : le bouton ✕ en haut permet de quitter, et le bouton vert en bas passe à la question suivante.
 
 ### Appareil photo sur téléphone
 
@@ -267,6 +270,7 @@ data/
 ├── quizzes/<id>.json        quiz générés
 ├── results/<profil>.json    historique des résultats
 ├── cache/                   cache IA (synthèses et quiz) → évite les appels payants
+├── img/                     tes images IA (mascotte, décors, badges…) → voir section 16
 ├── logs/connections.jsonl   journal des connexions
 ├── stats.json               compteurs d'appels IA / appels évités
 ├── session-secret.key       secret de signature des sessions (généré automatiquement)
@@ -440,10 +444,37 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 **Une photo iPhone (HEIC) est refusée**
 → Dans Réglages iPhone → Appareil photo → Formats → **Le plus compatible**, ou importe la photo depuis la galerie (iOS la convertit généralement en JPEG).
 
+**Les images (mascotte, décors) n'apparaissent pas**
+→ Elles s'ajoutent depuis Profil → Administration → **🖼️ Images** (voir section 16). Tant qu'une image manque, un emoji la remplace : c'est normal.
+
 **Repartir de zéro (⚠️ efface TOUTES les données)**
 ```bash
 cd ~/etudiantia && docker compose down && sudo rm -rf data && docker compose up -d
 ```
+
+---
+
+## 16. Personnaliser l'apparence (images IA) et installer sur l'écran d'accueil
+
+### Les images
+
+L'application est entièrement utilisable sans image (emojis et décors dessinés en CSS). Pour lui donner son style « cartoon » complet, tu peux ajouter des **images générées par IA** : mascotte, logo, décors de fond, icônes, badges.
+
+1. Ouvre l'application → **Profil** → **🛠️ Administration** (PIN) → onglet **🖼️ Images**.
+2. Pour chaque image : touche **📋 Prompt** (le texte est copié ; sinon sélectionne-le avec un appui long), colle-le dans ton outil d'IA, enregistre l'image sur ton téléphone.
+3. Touche **⬆️ Importer** et choisis l'image : elle apparaît tout de suite dans l'application.
+4. **↩️** retire ton image et rétablit celle d'origine.
+
+Commence par les **9 images « Essentielles »**. Le guide complet (style, cohérence entre les poses de la mascotte, tailles, tous les prompts) est dans **[IMAGES-IA.md](IMAGES-IA.md)**.
+
+Tes images sont rangées dans `data/img/` : elles **survivent aux mises à jour** et font partie des sauvegardes. Tu peux aussi y copier des fichiers toi-même (`scp`), en respectant le nom exact (ex. `mascot_happy.png`, `bg_home.jpg`).
+
+### Installer l'application sur l'écran d'accueil
+
+- **iPhone (Safari)** : bouton *Partager* → **Sur l'écran d'accueil**.
+- **Android (Chrome)** : menu ⋮ → **Ajouter à l'écran d'accueil** (ou *Installer l'application*).
+
+L'application s'ouvre alors en plein écran, avec son icône (l'image `icon` de l'onglet Images ; une icône provisoire est fournie). Si tu changes l'icône plus tard, supprime le raccourci et recrée-le.
 
 ---
 

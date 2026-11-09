@@ -1,0 +1,17 @@
+{
+  "name": "StudyAI",
+  "short_name": "StudyAI",
+  "description": "Scanne tes cours, révise avec des quiz générés par l'IA.",
+  "lang": "fr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#BFE6FF",
+  "theme_color": "#8B5CF6",
+  "icons": [
+    { "src": "/img/icon", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/img/icon", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/img/icon", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

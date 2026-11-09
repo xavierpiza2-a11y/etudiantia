@@ -3,6 +3,7 @@
 // → analyse IA seulement si ce cours n'est pas déjà connu (cache).
 import { useState, useRef, useCallback, useEffect } from "react";
 import { api } from "../lib/api";
+import { Img, Mascot } from "../lib/images";
 
 const MAX_IMAGE_DIMENSION = 1800;
 const MAX_FILES = 5;
@@ -304,9 +305,9 @@ export default function Upload({ onComplete }) {
             {capturedBlobs.length === 0 ? (
               <>
                 <div className="drop-zone-icon">📄</div>
-                <p className="drop-zone-title">Glisse tes images ici</p>
-                <p className="drop-zone-sub">ou utilise les boutons ci-dessous</p>
-                <p className="drop-zone-hint">JPG, PNG, WEBP · max {MAX_FILES} pages</p>
+                <p className="drop-zone-title">Ajoute les pages de ton cours</p>
+                <p className="drop-zone-sub">Prends-les en photo ou choisis-les dans ta galerie</p>
+                <p className="drop-zone-hint">Jusqu'à {MAX_FILES} pages</p>
               </>
             ) : (
               <div className={`previews-grid previews-${Math.min(capturedBlobs.length, 5)}`}>
@@ -335,14 +336,14 @@ export default function Upload({ onComplete }) {
 
           <div className="upload-actions">
             <button className="btn-camera" onClick={openCamera} disabled={capturedBlobs.length >= MAX_FILES}>
-              📷 Caméra
+              <Img name="icon_camera" fallback="📷" size={30} /> Caméra
             </button>
             <button
               className="btn-file"
               onClick={() => fileInputRef.current?.click()}
               disabled={capturedBlobs.length >= MAX_FILES}
             >
-              🖼️ Fichier
+              <Img name="icon_file" fallback="🖼️" size={30} /> Fichier
             </button>
             {capturedBlobs.length > 0 && (
               <button className="btn-reset-sm" onClick={handleReset}>
@@ -355,18 +356,25 @@ export default function Upload({ onComplete }) {
             {capturedBlobs.length} / {MAX_FILES} page{capturedBlobs.length > 1 ? "s" : ""}
           </p>
 
-          {error && <p className="upload-error">{error}</p>}
-
-          {retryCourseId && (
-            <button className="btn-analyze" onClick={() => runSummarize(retryCourseId, null)}>
-              🔄 Réessayer l'analyse (images déjà enregistrées)
-            </button>
+          {error && (
+            <div className="upload-error-box">
+              <Mascot mood="sad" size={80} />
+              <p className="upload-error">{error}</p>
+            </div>
           )}
 
-          {!retryCourseId && capturedBlobs.length > 0 && (
-            <button className="btn-analyze" onClick={handleAnalyze}>
-              Analyser {capturedBlobs.length > 1 ? `les ${capturedBlobs.length} pages` : "la page"} →
-            </button>
+          {(retryCourseId || capturedBlobs.length > 0) && (
+            <div className="action-bar">
+              {retryCourseId ? (
+                <button className="btn-analyze" onClick={() => runSummarize(retryCourseId, null)}>
+                  🔄 Réessayer l'analyse (images déjà enregistrées)
+                </button>
+              ) : (
+                <button className="btn-analyze" onClick={handleAnalyze}>
+                  Analyser {capturedBlobs.length > 1 ? `les ${capturedBlobs.length} pages` : "la page"} →
+                </button>
+              )}
+            </div>
           )}
 
           <input
@@ -388,6 +396,7 @@ export default function Upload({ onComplete }) {
         </div>
       ) : (
         <div className="processing-card">
+          <Mascot mood={step === "done" ? "win" : "think"} size={120} />
           {previews.length > 0 && (
             <div className={`previews-grid previews-${Math.min(previews.length, 5)}`}>
               {previews.map((url, i) => (

@@ -98,6 +98,39 @@ export default function UserList({ profiles, onToggleDisabled, onDelete, onSelec
         </table>
         {filtered.length === 0 && <p className="admin-empty">Aucun profil trouvé.</p>}
       </div>
+
+      {/* Mobile : une carte par profil, boutons à portée du pouce */}
+      <div className="admin-cards">
+        {filtered.map((p) => (
+          <div key={p.id} className={`admin-card ${p.disabled ? "row-disabled" : ""}`}>
+            <button className="admin-card-head" onClick={() => onSelect(p.id)}>
+              <span className="admin-card-avatar">{p.avatar}</span>
+              <span className="admin-card-name">{p.name}</span>
+              <span className={`admin-badge ${p.disabled ? "badge-disabled" : "badge-active"}`}>
+                {p.disabled ? "Désactivé" : "Actif"}
+              </span>
+            </button>
+            <p className="admin-card-sub">
+              {p.xp || 0} XP · niv. {p.level || 1} · {p.courseCount || 0} cours · {p.resultCount || 0} quiz · {formatBytes(p.storageBytes)}
+            </p>
+            <div className="admin-card-actions">
+              <button
+                className={`admin-action-btn ${isConfirming(p.id, "toggle") ? "confirm" : ""}`}
+                onClick={() => run(p, "toggle")}
+              >
+                {isConfirming(p.id, "toggle") ? "Confirmer ?" : p.disabled ? "Réactiver" : "Désactiver"}
+              </button>
+              <button
+                className={`admin-action-btn danger ${isConfirming(p.id, "delete") ? "confirm" : ""}`}
+                onClick={() => run(p, "delete")}
+              >
+                {isConfirming(p.id, "delete") ? "Supprimer définitivement ?" : "🗑 Supprimer"}
+              </button>
+            </div>
+          </div>
+        ))}
+        {filtered.length === 0 && <p className="admin-empty">Aucun profil trouvé.</p>}
+      </div>
     </div>
   );
 }

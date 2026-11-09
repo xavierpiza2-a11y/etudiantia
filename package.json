@@ -1,7 +1,7 @@
 {
   "name": "etudiantia",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Étudiant IA — scanne tes cours, génère des quiz, progresse avec XP et badges. Auto-hébergé (Docker).",
   "type": "module",
   "engines": {
@@ -17,8 +17,8 @@
     "express": "^4.21.2"
   },
   "devDependencies": {
-    "@fontsource/inter": "^5.1.0",
-    "@fontsource/sora": "^5.1.0",
+    "@fontsource/fredoka": "^5.3.0",
+    "@fontsource/nunito": "^5.3.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",

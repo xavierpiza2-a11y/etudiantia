@@ -6,11 +6,13 @@ import AdminDashboard from "./AdminDashboard";
 import UserList from "./UserList";
 import UserDetail from "./UserDetail";
 import ConnectionLogs from "./ConnectionLogs";
+import AdminImages from "./AdminImages";
 
 const TABS = [
   { id: "overview", label: "📊 Vue d'ensemble" },
   { id: "users", label: "👥 Profils" },
   { id: "logs", label: "🔌 Connexions" },
+  { id: "images", label: "🖼️ Images" },
 ];
 
 // Saisie du PIN administrateur (ADMIN_PIN du fichier .env)
@@ -93,7 +95,9 @@ function AdminContent({ onLock }) {
       {error && <p className="upload-error" role="alert">{error}</p>}
 
       <div className="admin-content">
-        {loading && tab !== "logs" && !data ? (
+        {tab === "images" ? (
+          <AdminImages />
+        ) : loading && tab !== "logs" && !data ? (
           <p className="loading-text">Chargement des données…</p>
         ) : (
           <>

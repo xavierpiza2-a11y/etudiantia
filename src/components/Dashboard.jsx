@@ -2,13 +2,14 @@
 import { useState, useEffect } from "react";
 import { api } from "../lib/api";
 import { getLevelFromXP, BADGES } from "../hooks/useXP";
+import { Img } from "../lib/images";
 
 function XPBar({ xp }) {
   const { current, next, progress } = getLevelFromXP(xp);
   return (
     <div className="xp-bar-container">
       <div className="xp-level-row">
-        <span className="xp-level-icon">{current.icon}</span>
+        <Img name={`level_${current.level}`} fallback={current.icon} size={52} className="xp-level-icon" />
         <div className="xp-level-info">
           <span className="xp-level-name">Niv. {current.level} — {current.name}</span>
           <span className="xp-total">{xp} XP</span>
@@ -44,7 +45,9 @@ function BadgeGrid({ earnedBadges }) {
               className={`badge-card ${earned ? "earned" : "locked"}`}
               title={badge.desc}
             >
-              <span className="badge-icon">{earned ? badge.icon : "🔒"}</span>
+              <span className="badge-icon">
+                {earned ? <Img name={`badge_${badge.id}`} fallback={badge.icon} size={52} /> : "🔒"}
+              </span>
               <span className="badge-name">{badge.name}</span>
             </div>
           );

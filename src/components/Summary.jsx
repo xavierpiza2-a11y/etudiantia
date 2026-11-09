@@ -1,6 +1,7 @@
 // src/components/Summary.jsx
 import { useState, useEffect, useRef } from "react";
 import { QUIZ_MIN_QUESTIONS, QUIZ_MAX_QUESTIONS } from "../hooks/useXP";
+import { Mascot } from "../lib/images";
 
 const DIFFICULTY_META = {
   facile:    { label: "Facile",    color: "#10B981" },
@@ -55,7 +56,7 @@ function QuizGeneratingProgress({ total }) {
 
   return (
     <div className="quiz-generating">
-      <div className="quiz-generating-icon">🧠</div>
+      <Mascot mood="think" size={120} />
       <p className="quiz-generating-title">Préparation de ton quiz…</p>
       <p className="quiz-generating-sub">{total} questions</p>
       <div className="progress-bar-track generating-track">
@@ -157,35 +158,39 @@ export default function Summary({
       {generating ? (
         <QuizGeneratingProgress total={total} />
       ) : !showConfig ? (
-        hasQuiz ? (
-          <>
-            <button className="btn-start-quiz" onClick={onOpenQuiz}>
-              Lancer le quiz ▶️
-            </button>
+        <>
+          {hasQuiz && (
             <button className="btn-new-quiz" onClick={() => setShowConfig(true)}>
               🔄 Générer un autre quiz (nouvel appel IA)
             </button>
-          </>
-        ) : (
-          <button className="btn-start-quiz" onClick={() => setShowConfig(true)}>
-            Configurer le quiz ⚙️
-          </button>
-        )
+          )}
+          {/* Bouton principal : barre fixe en bas de l'écran, à portée du pouce */}
+          <div className="action-bar">
+            <button
+              className="btn-start-quiz"
+              onClick={hasQuiz ? onOpenQuiz : () => setShowConfig(true)}
+            >
+              {hasQuiz ? "Lancer le quiz ▶️" : "Configurer le quiz ⚙️"}
+            </button>
+          </div>
+        </>
       ) : (
-        <div className="quiz-config">
-          <h3 className="config-title">⚙️ {hasQuiz ? "Nouveau quiz" : "Configurer le quiz"}</h3>
+        <>
+          <div className="quiz-config">
+            <h3 className="config-title">⚙️ {hasQuiz ? "Nouveau quiz" : "Configurer le quiz"}</h3>
 
-          <div className="counters-list">
-            <Counter label="QCM" icon="🎯" value={qcm} onChange={setQcm} max={MAX_QUESTIONS} />
-            <Counter label="Vrai / Faux" icon="⚡" value={vraiFaux} onChange={setVraiFaux} max={MAX_QUESTIONS} />
-            <Counter label="Texte à trous" icon="✍️" value={texteTrous} onChange={setTexteTrous} max={MAX_QUESTIONS} />
+            <div className="counters-list">
+              <Counter label="QCM" icon="🎯" value={qcm} onChange={setQcm} max={MAX_QUESTIONS} />
+              <Counter label="Vrai / Faux" icon="⚡" value={vraiFaux} onChange={setVraiFaux} max={MAX_QUESTIONS} />
+              <Counter label="Texte à trous" icon="✍️" value={texteTrous} onChange={setTexteTrous} max={MAX_QUESTIONS} />
+            </div>
+
+            <div className="config-total" style={{ color: getStatusColor() }}>
+              {getStatusLabel()}
+            </div>
           </div>
 
-          <div className="config-total" style={{ color: getStatusColor() }}>
-            {getStatusLabel()}
-          </div>
-
-          <div className="config-actions">
+          <div className="action-bar action-bar-row">
             <button className="btn-config-cancel" onClick={() => setShowConfig(false)}>
               ← Retour
             </button>
@@ -193,7 +198,7 @@ export default function Summary({
               Générer le quiz 🚀
             </button>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 // src/components/CourseList.jsx
 import { useState, useEffect, useCallback } from "react";
 import { api } from "../lib/api";
+import { Mascot } from "../lib/images";
 
 const DIFFICULTY_META = {
   facile: { label: "Facile", color: "#10B981" },
@@ -73,7 +74,7 @@ export default function CourseList({ onOpenCourse }) {
 
   if (!courses.length) return (
     <div className="empty-courses">
-      <div className="empty-courses-icon">📚</div>
+      <Mascot mood="happy" size={130} />
       <p className="empty-courses-title">Aucun cours scanné pour l'instant</p>
       <p className="empty-courses-sub">Prends en photo ton premier cours !</p>
     </div>

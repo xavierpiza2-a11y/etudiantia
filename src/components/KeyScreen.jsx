@@ -2,6 +2,7 @@
 // Écran d'accès : saisie de la clé d'accès définie dans le fichier .env du serveur.
 import { useState } from "react";
 import { api } from "../lib/api";
+import { Mascot } from "../lib/images";
 
 export default function KeyScreen({ onSuccess }) {
   const [key, setKey] = useState("");
@@ -28,7 +29,7 @@ export default function KeyScreen({ onSuccess }) {
   return (
     <div className="login-screen">
       <form className="login-card" onSubmit={submit}>
-        <div className="login-logo">🎓</div>
+        <Mascot mood="happy" size={130} />
         <h1 className="login-title">StudyAI</h1>
         <p className="login-subtitle">Entre la clé d'accès pour continuer.</p>
 

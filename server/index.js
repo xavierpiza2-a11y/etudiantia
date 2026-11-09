@@ -11,6 +11,7 @@ import { initAuth } from "./auth.js";
 import { seedDefaultProfiles } from "./profiles.js";
 import { router, apiErrorHandler } from "./routes.js";
 import { adminRouter } from "./admin.js";
+import { publicImageRouter, adminImagesRouter } from "./images.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.resolve(__dirname, "../dist");
@@ -80,9 +81,13 @@ app.use("/api", (_req, res, next) => {
   next();
 });
 app.use("/api", router);
+app.use("/api/admin/images", adminImagesRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api", (_req, res) => res.status(404).json({ error: "not_found" }));
 app.use("/api", apiErrorHandler);
+
+// Images personnalisables (publiques : le logo et le décor servent avant la connexion)
+app.use("/img", publicImageRouter);
 
 // ── Interface (build Vite) ───────────────────────────────────────────────
 if (fs.existsSync(distDir)) {
@@ -91,7 +96,9 @@ if (fs.existsSync(distDir)) {
     express.static(path.join(distDir, "assets"), { maxAge: "1y", immutable: true })
   );
   app.use(express.static(distDir, { maxAge: 0, index: false }));
-  app.get("*", (_req, res) => {
+  app.get("*", (req, res) => {
+    // Un fichier manquant (ex. /img/xxx.png) doit répondre 404, pas la page d'accueil
+    if (path.extname(req.path)) return res.status(404).end();
     res.setHeader("Cache-Control", "no-cache");
     res.sendFile(path.join(distDir, "index.html"));
   });

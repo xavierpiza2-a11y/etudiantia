@@ -58,9 +58,39 @@ async function request(method, path, body) {
   return data;
 }
 
+// Envoi d'un fichier brut (import d'images dans l'admin)
+async function upload(path, file) {
+  let res;
+  try {
+    res = await fetch(`/api${path}`, {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: { "Content-Type": file.type || "application/octet-stream" },
+      body: file,
+    });
+  } catch {
+    throw new ApiError("Impossible de joindre le serveur.", { status: 0 });
+  }
+  let data = null;
+  try {
+    data = await res.json();
+  } catch {
+    /* corps vide */
+  }
+  if (!res.ok) {
+    if (res.status === 413) throw new ApiError("Fichier trop volumineux (10 Mo maximum).", { status: 413 });
+    if ([401, 403].includes(res.status) && ["auth_required", "admin_required"].includes(data?.error)) {
+      window.dispatchEvent(new Event(SESSION_INVALID_EVENT));
+    }
+    throw new ApiError(MESSAGES[data?.error] || data?.error || `Erreur ${res.status}`, { status: res.status });
+  }
+  return data;
+}
+
 export const api = {
   get: (path) => request("GET", path),
   post: (path, body = {}) => request("POST", path, body),
   patch: (path, body = {}) => request("PATCH", path, body),
   del: (path) => request("DELETE", path),
+  upload,
 };

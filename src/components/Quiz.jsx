@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { api } from "../lib/api";
 import { XP_REWARDS, isAnswerCorrect } from "../hooks/useXP";
+import { Img, Mascot } from "../lib/images";
 
 // Composant : question QCM
 function QCMQuestion({ question, onAnswer, answered }) {
@@ -112,6 +113,11 @@ function TexteTrousQuestion({ question, onAnswer, answered }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+            enterKeyHint="done"
+            autoComplete="off"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
             autoFocus
           />
           {question.hint && (
@@ -133,9 +139,9 @@ function TexteTrousQuestion({ question, onAnswer, answered }) {
 
 // Badge de type de question
 const TYPE_META = {
-  qcm: { label: "QCM", color: "#7C3AED", icon: "🎯" },
-  vrai_faux: { label: "Vrai / Faux", color: "#F59E0B", icon: "⚡" },
-  texte_a_trous: { label: "Texte à trous", color: "#10B981", icon: "✍️" },
+  qcm: { label: "QCM", color: "#7C3AED", icon: "🎯", img: "type_qcm" },
+  vrai_faux: { label: "Vrai / Faux", color: "#F59E0B", icon: "⚡", img: "type_vrai_faux" },
+  texte_a_trous: { label: "Texte à trous", color: "#10B981", icon: "✍️", img: "type_texte_a_trous" },
 };
 
 // Composant résultat final
@@ -146,6 +152,7 @@ function QuizResults({ score, maxScore, questions, answers, xpGained: serverXP, 
 
   return (
     <div className="results-card">
+      <Mascot mood={pct >= 60 ? "win" : pct >= 30 ? "happy" : "sad"} size={150} />
       <div className="results-stars">{"⭐".repeat(stars)}{"🌑".repeat(3 - stars)}</div>
       <h2 className="results-title">
         {pct === 100 ? "Parfait !" : pct >= 60 ? "Bien joué !" : "Continue !"}
@@ -179,7 +186,7 @@ function QuizResults({ score, maxScore, questions, answers, xpGained: serverXP, 
 }
 
 // Composant principal Quiz
-export default function Quiz({ quizId, questions, onActivity, onHome }) {
+export default function Quiz({ quizId, questions, onActivity, onHome, onScene }) {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState([]);
   const [answered, setAnswered] = useState(false);
@@ -190,8 +197,27 @@ export default function Quiz({ quizId, questions, onActivity, onHome }) {
   const [serverXP, setServerXP] = useState(null);
   const [saveError, setSaveError] = useState(null);
 
+  const feedbackRef = useRef(null);
+
   const current = questions[currentIdx];
   const meta = TYPE_META[current?.type] || TYPE_META.qcm;
+
+  // Décor : « quiz » pendant les questions, « résultats » à la fin
+  useEffect(() => {
+    onScene?.(finished ? "results" : "quiz");
+    return () => onScene?.("quiz");
+  }, [finished]);
+
+  // Le retour (bonne/mauvaise réponse + explication) est toujours amené à l'écran
+  useEffect(() => {
+    if (showExplanation) {
+      feedbackRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [showExplanation]);
+
+  const handleQuit = () => {
+    if (window.confirm("Quitter le quiz ? Ta progression sur ce quiz sera perdue.")) onHome();
+  };
 
   const handleAnswer = async (isCorrect, value) => {
     setAnswered(true);
@@ -262,6 +288,7 @@ export default function Quiz({ quizId, questions, onActivity, onHome }) {
     <div className="quiz-wrapper">
       {/* Header progression */}
       <div className="quiz-header">
+        <button className="quiz-quit" onClick={handleQuit} aria-label="Quitter le quiz">✕</button>
         <div className="quiz-progress-track">
           <div
             className="quiz-progress-fill"
@@ -278,7 +305,7 @@ export default function Quiz({ quizId, questions, onActivity, onHome }) {
         key={currentIdx} // force re-mount pour reset state interne
       >
         <div className="question-type-badge">
-          <span>{meta.icon}</span>
+          <Img name={meta.img} fallback={meta.icon} size={28} />
           <span>{meta.label}</span>
           <span className="question-pts">+{current.points} pts</span>
         </div>
@@ -295,17 +322,26 @@ export default function Quiz({ quizId, questions, onActivity, onHome }) {
 
         {/* Feedback */}
         {showExplanation && (
-          <div className={`feedback-box ${lastCorrect ? "feedback-correct" : "feedback-wrong"}`}>
+          <div
+            ref={feedbackRef}
+            className={`feedback-box ${lastCorrect ? "feedback-correct" : "feedback-wrong"}`}
+          >
             <p className="feedback-title">
               {lastCorrect ? `✅ +${current.points} pts !` : "❌ Pas tout à fait…"}
             </p>
             <p className="feedback-explanation">{current.explanation}</p>
-            <button className="btn-next" onClick={handleNext}>
-              {currentIdx === questions.length - 1 ? "Voir les résultats 🏁" : "Question suivante →"}
-            </button>
           </div>
         )}
       </div>
+
+      {/* Bouton suivant : barre fixe en bas de l'écran, à portée du pouce */}
+      {showExplanation && (
+        <div className="action-bar">
+          <button className="btn-next" onClick={handleNext}>
+            {currentIdx === questions.length - 1 ? "Voir les résultats 🏁" : "Question suivante →"}
+          </button>
+        </div>
+      )}
 
       {/* Score courant */}
       <div className="quiz-score-bar">

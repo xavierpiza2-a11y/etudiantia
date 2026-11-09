@@ -9,6 +9,8 @@ const EVENT_LABELS = {
   admin_failed: "⛔ PIN incorrect",
   admin_profile_update: "✏️ Profil modifié (admin)",
   admin_profile_delete: "🗑 Profil supprimé (admin)",
+  admin_image_upload: "🖼️ Image importée (admin)",
+  admin_image_remove: "↩️ Image retirée (admin)",
 };
 
 export default function ConnectionLogs({ logs, loading }) {
@@ -42,6 +44,22 @@ export default function ConnectionLogs({ logs, loading }) {
             ))}
           </tbody>
         </table>
+        {logs.length === 0 && <p className="admin-empty">Aucun événement enregistré.</p>}
+      </div>
+
+      {/* Mobile : une carte par événement */}
+      <div className="admin-cards">
+        {logs.map((log, i) => (
+          <div key={`${log.t}-${i}`} className={`admin-card ${log.event.endsWith("_failed") ? "row-failed" : ""}`}>
+            <p className="admin-card-title">{EVENT_LABELS[log.event] || log.event}</p>
+            <p className="admin-card-sub">
+              {new Date(log.t).toLocaleString("fr-FR")}
+              {log.profile ? ` · ${log.profile}` : ""}
+              {log.image ? ` · ${log.image}` : ""}
+            </p>
+            <p className="admin-card-sub">{log.ip || "—"}</p>
+          </div>
+        ))}
         {logs.length === 0 && <p className="admin-empty">Aucun événement enregistré.</p>}
       </div>
     </div>

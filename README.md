@@ -12,7 +12,9 @@ Scanne tes cours en photo, laisse l'IA (Claude) créer un résumé et des quiz, 
 - 💾 **Tout est conservé dans `/data`** (photos, résumés, quiz, résultats) : réviser ne coûte **aucun appel IA**
 - ♻️ **Cache intelligent** : mêmes photos ou même synthèse + même répartition de quiz → résultat réutilisé
 - 🏆 XP, niveaux, badges, séries de jours (calculés côté serveur)
-- 🛠️ **Espace admin** (PIN) : profils, appels IA évités, tokens, stockage, journal des connexions, export
+- 📱 **Pensé pour le smartphone** : barre d'onglets en bas, boutons larges, actions principales à portée du pouce, installable sur l'écran d'accueil
+- 🎨 **Style cartoon** avec mascotte, décors et badges **générés par IA** (import depuis le téléphone, prompts fournis → [IMAGES-IA.md](IMAGES-IA.md))
+- 🛠️ **Espace admin** (PIN) : profils, appels IA évités, tokens, stockage, journal des connexions, images, export
 - 🔄 **`update-freebox.sh`** : mise à jour (manuelle ou automatique chaque nuit) avec sauvegarde de `/data` et retour arrière automatique
 
 ## 🚀 Installation
@@ -41,8 +43,9 @@ Navigateur ──HTTP──▶ Conteneur Docker (Node 22 + Express)
 ```
 
 ```
-server/    API Express (auth, stockage JSON, cache IA, admin, Anthropic)
-shared/    règles d'XP / niveaux / badges partagées client + serveur
+server/    API Express (auth, stockage JSON, cache IA, admin, images, Anthropic)
+shared/    règles d'XP / niveaux / badges + registre des images partagés client + serveur
+scripts/   génération du guide d'images (IMAGES-IA.md)
 src/       interface React
 docker/    entrypoint du conteneur
 ```
