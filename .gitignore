@@ -1,0 +1,31 @@
+# Secrets — NE JAMAIS COMMITER
+.env
+.env.local
+.env.*.local
+
+# Données de l'application (protégées lors des mises à jour)
+/data/
+/data-dev/
+/backups/
+update.log
+.update.lock
+.update-failed
+
+# Dépendances
+node_modules/
+
+# Build
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db
